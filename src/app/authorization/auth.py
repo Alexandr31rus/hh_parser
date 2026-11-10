@@ -102,3 +102,43 @@ def register():
             )
             return redirect("register")
     return render_template("register.html")
+
+
+def verify_password(stored_password, provided_password):
+    """Проверяет пароль по сохранённому хешу.
+
+    Восстанавливает из ``stored_password`` соль (первые 64 hex-символа)
+    и ожидаемый хеш (остаток строки), затем вычисляет PBKDF2-HMAC-SHA512
+    от ``provided_password`` с этой солью и 100 000 итерациями — теми же
+    параметрами, что использует :func:`hash_password`. Сравнивает
+    полученный хеш с сохранённым.
+
+    Формат ``stored_password``::
+
+        <64 hex-символа соли><128 hex-символов хеша>
+
+    именно в таком виде его возвращает :func:`hash_password`, поэтому
+    строка подходит для прямой передачи из колонки ``users.password``.
+
+    Args:
+        stored_password: Сохранённый хеш в формате
+            ``"<salt_hex><hash_hex>"`` — ровно 192 ASCII-символа.
+        provided_password: Пароль в открытом виде, введённый
+            пользователем. Кодируется в UTF-8 внутри функции.
+
+    Returns:
+        bool: ``True``, если пароль соответствует сохранённому хешу,
+        иначе ``False``.
+    """
+
+    salt = stored_password[:64]
+    stored_password = stored_password[64:]
+    pwdhash = pbkdf2_hmac(
+        "sha512",
+        provided_password.encode("utf-8"),
+        salt.encode('ascii'),
+        100000
+    )
+    pwdhash = hexlify(pwdhash).decode("ascii")
+    return pwdhash == stored_password
+
