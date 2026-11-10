@@ -190,3 +190,30 @@ def login():
                 flash("Указан неверный пароль")
 
     return render_template("login.html")
+
+@auth_blueprint.route("/logout", methods=["GET", "POST"])
+def logout():
+    """Завершает сессию пользователя (выход из аккаунта).
+
+    POST удаляет из ``flask.session`` ключи ``user_id`` и ``user_name``
+    и перенаправляет на страницу входа.
+
+    Выход **идемпотентен**: ключи удаляются через
+    ``session.pop(..., None)``, поэтому повторный POST (например,
+    «Выйти» в двух вкладках) не вызовет ``KeyError`` — просто
+    ничего не удалит и снова редиректнет на логин.
+
+    GET отдаёт форму ``login.html`` и **не выполняет выход**, чтобы
+    случайный переход по ссылке или предзагрузка страницы браузером
+    не разлогинивали пользователя. Для выхода нужен именно POST.
+
+    Returns:
+        Response: редирект на ``login`` после выхода (POST), либо
+        отрендеренный ``login.html`` (GET).
+    """
+    if request.method == "POST":
+        # Удаляем из сессии атрибуты пользователя
+        session.pop("user_id", None)
+        session.pop("user_name", None)
+        return redirect("login")
+    return render_template("login.html")
