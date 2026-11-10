@@ -2,7 +2,7 @@ from binascii import hexlify
 from hashlib import pbkdf2_hmac, sha256
 from os import urandom
 
-from flask import Blueprint, flash, redirect, render_template, request
+from flask import Blueprint, flash, redirect, render_template, request, session
 
 from ..database import db_session
 from ..models import User
@@ -42,6 +42,43 @@ def hash_password(password):
     pwdhash = hexlify(pwdhash)
     return (salt + pwdhash).decode("ascii")
 
+def verify_password(stored_password, provided_password):
+    """Проверяет пароль по сохранённому хешу.
+
+    Восстанавливает из ``stored_password`` соль (первые 64 hex-символа)
+    и ожидаемый хеш (остаток строки), затем вычисляет PBKDF2-HMAC-SHA512
+    от ``provided_password`` с этой солью и 100 000 итерациями — теми же
+    параметрами, что использует :func:`hash_password`. Сравнивает
+    полученный хеш с сохранённым.
+
+    Формат ``stored_password``::
+
+        <64 hex-символа соли><128 hex-символов хеша>
+
+    именно в таком виде его возвращает :func:`hash_password`, поэтому
+    строка подходит для прямой передачи из колонки ``users.password``.
+
+    Args:
+        stored_password: Сохранённый хеш в формате
+            ``"<salt_hex><hash_hex>"`` — ровно 192 ASCII-символа.
+        provided_password: Пароль в открытом виде, введённый
+            пользователем. Кодируется в UTF-8 внутри функции.
+
+    Returns:
+        bool: ``True``, если пароль соответствует сохранённому хешу,
+        иначе ``False``.
+    """
+
+    salt = stored_password[:64]
+    stored_password = stored_password[64:]
+    pwdhash = pbkdf2_hmac(
+        "sha512",
+        provided_password.encode("utf-8"),
+        salt.encode('ascii'),
+        100000
+    )
+    pwdhash = hexlify(pwdhash).decode("ascii")
+    return pwdhash == stored_password
 
 @auth_blueprint.route("/register", methods=["GET", "POST"])
 def register():
@@ -104,41 +141,52 @@ def register():
     return render_template("register.html")
 
 
-def verify_password(stored_password, provided_password):
-    """Проверяет пароль по сохранённому хешу.
+@auth_blueprint.route("/login", methods=["GET", "POST"])
+def login():
+    """Аутентифицирует пользователя по email и паролю.
 
-    Восстанавливает из ``stored_password`` соль (первые 64 hex-символа)
-    и ожидаемый хеш (остаток строки), затем вычисляет PBKDF2-HMAC-SHA512
-    от ``provided_password`` с этой солью и 100 000 итерациями — теми же
-    параметрами, что использует :func:`hash_password`. Сравнивает
-    полученный хеш с сохранённым.
+    GET отдаёт форму ``login.html``. POST читает ``Email`` и
+    ``Password``, ищет пользователя в ``users`` и проверяет пароль
+    через :func:`verify_password`.
 
-    Формат ``stored_password``::
+    Порядок проверок при POST:
 
-        <64 hex-символа соли><128 hex-символов хеша>
-
-    именно в таком виде его возвращает :func:`hash_password`, поэтому
-    строка подходит для прямой передачи из колонки ``users.password``.
-
-    Args:
-        stored_password: Сохранённый хеш в формате
-            ``"<salt_hex><hash_hex>"`` — ровно 192 ASCII-символа.
-        provided_password: Пароль в открытом виде, введённый
-            пользователем. Кодируется в UTF-8 внутри функции.
+    1. Пользователь с указанным ``email`` существует. Если нет —
+       flash-сообщение и повторный рендер ``register.html``.
+    2. Введённый пароль соответствует сохранённому хешу. Если да —
+       в ``flask.session`` пишутся ``user_id`` и ``user_name``,
+       затем редирект на ``/``. Если нет — flash-сообщение об
+       ошибке, форма рендерится заново.
 
     Returns:
-        bool: ``True``, если пароль соответствует сохранённому хешу,
-        иначе ``False``.
+        Response: редирект на ``/`` при успешной аутентификации,
+        либо отрендеренный шаблон (``login.html`` для GET и неверного
+        пароля, ``register.html`` для незарегистрированного email).
+
     """
+    if request.method == "POST":
+        # Достаем из формы данные пользователя
+        email = request.form["Email"].strip().lower()
+        password = request.form["Password"]
+        # Находим пользователя в БД
+        exists = db_session.query(User).filter(User.email == email).first()
+        # Если пользователь не найден выдаем сообщение об ошибке
+        if not exists:
+            flash("Такой пользователь не зарегистрирован.")
+            return render_template("register.html")
+        else:
+            # Если пользователь существует
+            user_id = exists.id
+            user_name = exists.name
+            h_password = exists.password
+            # Проверяем правильность введеного пароля
+            if verify_password(h_password, password):
+                # Если пароль указан правильно, то отправляем пользователя на главную страницу
+                session["user_name"] = user_name
+                session["user_id"] = user_id
+                return redirect("/")
+            else:
+                # Если пароль не правильный, то выдаем сообщение об ошибке
+                flash("Указан неверный пароль")
 
-    salt = stored_password[:64]
-    stored_password = stored_password[64:]
-    pwdhash = pbkdf2_hmac(
-        "sha512",
-        provided_password.encode("utf-8"),
-        salt.encode('ascii'),
-        100000
-    )
-    pwdhash = hexlify(pwdhash).decode("ascii")
-    return pwdhash == stored_password
-
+    return render_template("login.html")

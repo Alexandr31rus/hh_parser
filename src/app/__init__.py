@@ -43,8 +43,10 @@ def create_app():
         зарегистрированными blueprint'ами.
     """
     from .flask_parser.flask_parser import parser_blueprint
+    from .authorization.auth import auth_blueprint
 
     app.register_blueprint(parser_blueprint)
+    app.register_blueprint(auth_blueprint)
     return app
 
 
