@@ -222,5 +222,11 @@ __marimo__/
 # Streamlit
 .streamlit/secrets.toml
 .idea
+
+# SQLite
 *.sqlite
-/Database
+*.sqlite3
+*.db
+*.sqlite-journal
+*.sqlite-wal
+*.sqlite-shm
