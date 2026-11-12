@@ -3,7 +3,7 @@ from sqlalchemy import desc
 from ..app.models import Request
 
 
-def read_requsers(db_session):
+def read_requests(db_session):
     """Возвращает новые заявки, отсортированные по дате создания.
 
     Выбирает все записи из ``requests`` со статусом ``0``
