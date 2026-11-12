@@ -1,7 +1,7 @@
 from datetime import datetime
 
 from sqlalchemy import Column, DateTime, ForeignKey, Integer, String
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from .database import Base
 
@@ -92,7 +92,7 @@ class Request(Base):
     text_request = Column(String(150))
     file_name = Column(String(250))
     status = Column(Integer)
-    created = Column(DateTime(), default=datetime.now)
+    created: Mapped[datetime | None] = mapped_column(DateTime(), default=datetime.now)
     updated = Column(DateTime(), default=None)
     vacancy_number = Column(Integer)
     user = relationship("User", backref="requests")
