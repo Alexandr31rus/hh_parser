@@ -3,8 +3,7 @@ from pathlib import Path
 
 from sqlalchemy import create_engine
 from sqlalchemy.engine import make_url
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy.orm import declarative_base, sessionmaker
 
 from . import app
 
