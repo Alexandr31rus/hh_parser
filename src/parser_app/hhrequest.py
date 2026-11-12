@@ -133,6 +133,11 @@ class HHRequest:
             ``page >= pages - 1`` (достигнута последняя страница).
             Значение ``per_page=100`` — максимум, который отдаёт
             hh.ru за один запрос.
+
+        Note:
+            Возвращается **тот же** объект ``self._l_urls_vacancies``,
+            а не его копия. Список очищается в начале каждого вызова,
+            поэтому предыдущий результат после повторного вызова становится пустым.
         """
         if not self._s_url:
             raise ValueError("Не задан адрес сайта.")
@@ -143,7 +148,7 @@ class HHRequest:
         if self.i_region_id == 0:
             raise ValueError("Не задан регион поиска.")
 
-        self._s_url = self._s_url.replace("#", str(self.i_region_id))
+        url = self._s_url.replace("#", str(self.i_region_id))
         self._l_urls_vacancies.clear()
 
         i_page_number = 0
@@ -153,7 +158,7 @@ class HHRequest:
                 "page": i_page_number,
                 "per_page": 100,
             }
-            j_result = req.get(self._s_url, params=j_params)
+            j_result = req.get(url, params=j_params)
 
             if j_result.status_code != 200:
                 return []
