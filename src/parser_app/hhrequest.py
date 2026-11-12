@@ -69,7 +69,7 @@ class HHRequest:
         """
         self._s_url = url
 
-    def set_region(self, name: str) -> None:
+    def set_region(self, name: str) -> dict:
         """Определяет идентификатор региона по его названию.
 
         Обращается к справочнику регионов hh.ru
