@@ -183,11 +183,64 @@ def update_request(db_session, row_request, file_name, number_vacancies):
 
 
 def add_skills(sum_skills: dict, skills_to_add: list):
-    pass
+    """Добавляет технологии в словарь с подсчётом частоты.
+
+        Для каждого элемента ``skills_to_add`` увеличивает счётчик в
+        ``sum_skills``: если технология уже есть — ``+1``, если нет —
+        создаёт запись со значением ``1``. Словарь **мутируется** —
+        изменения видны вызывающему коду.
+
+        Args:
+            sum_skills: Словарь-аккумулятор вида
+                ``{технология: count}``. Мутируется.
+            skills_to_add: Список технологий, которые нужно добавить
+                (результат :meth:`HHParserDescription.parse` или
+                :meth:`HHParserKeySkills.parser`). Повторы **не
+                отсеиваются**: если технология встречается в списке
+                несколько раз, счётчик увеличится на каждый.
+
+        Returns:
+            None
+        """
+    for s_skill in skills_to_add:
+        if s_skill in sum_skills:
+            sum_skills[s_skill] += 1
+        else:
+            sum_skills[s_skill] = 1
 
 
 def sort_skills(skills: dict, vacancies_number: int) -> dict:
-    return {}
+    """Сортирует технологии по частоте и переводит счётчики в проценты.
+
+        Сортирует словарь ``{технология: count}`` по убыванию ``count``
+        (самые частые сверху), затем заменяет каждое значение на долю
+        в процентах от ``vacancies_number``, округлённую до двух знаков
+        после запятой.
+
+        Args:
+            skills: Словарь вида ``{технология: count}`` — результат
+                накопления через :func:`add_skills`.
+            vacancies_number: Общее число обработанных вакансий.
+                Используется как делитель: ``count / vacancies_number
+                * 100``. **Не должен быть нулём** — иначе
+                :class:`ZeroDivisionError`.
+
+        Returns:
+            dict: Новый словарь ``{технология: процент}``, где
+            ``процент`` — ``float`` с двумя знаками после запятой.
+            Порядок ключей сохраняет сортировку по убыванию частоты
+            (Python 3.7+ гарантирует порядок вставки в ``dict``).
+
+        Raises:
+            ZeroDivisionError: Если ``vacancies_number == 0``. В
+                :func:`process_request` это возможно, когда все
+                вакансии отфильтрованы по не-200 статусу и
+                ``i_number_vacancies`` остался нулём.
+        """
+    d_sorted: dict = dict(sorted(skills.items(), key=lambda x: x[1], reverse=True))
+    for key, value in d_sorted.items():
+        d_sorted[key] = round((value / vacancies_number) * 100, 2)
+    return d_sorted
 
 
 def process_salary(all_salary: dict, salary: list) -> dict:
