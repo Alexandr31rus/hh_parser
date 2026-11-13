@@ -230,13 +230,9 @@ def sort_skills(skills: dict, vacancies_number: int) -> dict:
             ``процент`` — ``float`` с двумя знаками после запятой.
             Порядок ключей сохраняет сортировку по убыванию частоты
             (Python 3.7+ гарантирует порядок вставки в ``dict``).
-
-        Raises:
-            ZeroDivisionError: Если ``vacancies_number == 0``. В
-                :func:`process_request` это возможно, когда все
-                вакансии отфильтрованы по не-200 статусу и
-                ``i_number_vacancies`` остался нулём.
         """
+    if vacancies_number == 0:
+        return {}
     d_sorted: dict = dict(sorted(skills.items(), key=lambda x: x[1], reverse=True))
     for key, value in d_sorted.items():
         d_sorted[key] = round((value / vacancies_number) * 100, 2)
