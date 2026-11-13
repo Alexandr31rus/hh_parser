@@ -240,8 +240,72 @@ def sort_skills(skills: dict, vacancies_number: int) -> dict:
 
 
 def process_salary(all_salary: dict, salary: list) -> dict:
-    return {}
+    """Добавляет зарплату одной вакансии в общий аккумулятор.
+
+        Принимает результат :meth:`HHParserSalary.parse` — список
+        ``[грейд, from, to]`` — и обновляет запись для этого грейда
+        в ``all_salary``: прибавляет ``from`` и ``to`` к суммам,
+        увеличивает счётчик вакансий на ``1``.
+
+        Args:
+            all_salary: Словарь-аккумулятор вида
+                ``{"Junior": [sum_from, sum_to, count], ...}``. Должен
+                содержать ключи для всех четырёх грейдов
+                (``Junior``, ``Middle``, ``Senior``, ``Unknown``).
+                **Мутируется** — изменения видны вызывающему коду.
+            salary: Результат :meth:`HHParserSalary.parse` —
+                ``[грейд: str, from: float, to: float]``. Грейд —
+                одна из строк ``"Junior"``, ``"Middle"``,
+                ``"Senior"``, ``"Unknown"``. Границы — числа (одна
+                сторона вилки уже выровнена парсером).
+
+        Returns:
+            dict: Тот же ``all_salary`` (для удобства цепочек вызовов).
+            Так как словарь мутируется, возвращённый объект — это
+            **тот же** словарь, что передан в ``all_salary``, а не
+            копия.
+        """
+    if salary:
+        all_salary[salary[0]] = [all_salary[salary[0]][0] + salary[1],
+                                 all_salary[salary[0]][1] + salary[2],
+                                 all_salary[salary[0]][2] + 1]
+    return all_salary
 
 
 def avg_salary(all_salary: dict) -> dict:
-    return {}
+    """Усредняет зарплаты по грейдам.
+
+        Для каждого грейда делит накопленные суммы (``sum_from`` и
+        ``sum_to``) на количество вакансий (``count``) и заменяет
+        трёхэлементный список на двухэлементный со средними
+        значениями. Грейды с ``count == 0`` остаются без изменений —
+        в исходном виде ``[0, 0, 0]``.
+
+        Args:
+            all_salary: Словарь-аккумулятор вида
+                ``{"Junior": [sum_from, sum_to, count], ...}`` —
+                результат накопления через :func:`process_salary`.
+                **Мутируется**. Ожидаются ключи для всех четырёх
+                грейдов (``Junior``, ``Middle``, ``Senior``,
+                ``Unknown``) — они захардкожены в теле функции.
+
+        Returns:
+            dict: Тот же ``all_salary``, но для грейдов с ненулевым
+            ``count`` значения заменены на ``[avg_from, avg_to]``
+            (два элемента вместо трёх). Для грейдов с ``count == 0``
+            остаётся исходный ``[0, 0, 0]``.
+        """
+    # Вычисляем среднее значение зарплат по разным категориям
+    if all_salary['Senior'][2] != 0:
+        all_salary["Senior"] = [all_salary['Senior'][0] / all_salary['Senior'][2],
+                                all_salary['Senior'][1] / all_salary['Senior'][2]]
+    if all_salary['Middle'][2] != 0:
+        all_salary["Middle"] = [all_salary['Middle'][0] / all_salary['Middle'][2],
+                                all_salary['Middle'][1] / all_salary['Middle'][2]]
+    if all_salary['Junior'][2] != 0:
+        all_salary["Junior"] = [all_salary['Junior'][0] / all_salary['Junior'][2],
+                                all_salary['Junior'][1] / all_salary['Junior'][2]]
+    if all_salary['Unknown'][2] != 0:
+        all_salary["Unknown"] = [all_salary['Unknown'][0] / all_salary['Unknown'][2],
+                                 all_salary['Unknown'][1] / all_salary['Unknown'][2]]
+    return all_salary
