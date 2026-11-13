@@ -1,12 +1,21 @@
 from flask import Blueprint, flash, redirect, render_template, request, session
 from sqlalchemy.exc import SQLAlchemyError
-
+from sqlalchemy import desc
+from flask_table import Table, Col, LinkCol
 import src.parser_app.hhrequest as hr
 
 from ..database import db_session
 from ..models import Request
 
 parser_blueprint = Blueprint("flask_parser", __name__)
+
+
+class Item(object):
+    pass
+
+
+class ItemTable(Table):
+    pass
 
 
 @parser_blueprint.route("/")
@@ -103,3 +112,34 @@ def requests():
         # Если пользователь не авторизован то отправляем его в Login
         return redirect("login")
     return render_template("requests.html")
+
+
+@parser_blueprint.route('/history')
+def history():
+    """Отдаёт страницу с историей заявок текущего пользователя.
+
+        Доступна только авторизованным: если в сессии нет ``user_id``,
+        происходит редирект на страницу входа.
+
+        Для авторизованного пользователя:
+
+        1. Читает из БД список заявок через ``Item.get_element()``.
+        2. Оборачивает его в :class:`ItemTable` — HTML-таблицу для
+           шаблона.
+        3. Рендерит ``history.html``, передавая таблицу в контекст
+           под именем ``tables``.
+
+        Returns:
+            Response: редирект на ``login`` для неавторизованных,
+            либо отрендеренный ``history.html`` с таблицей заявок.
+        """
+    # Если пользователь не авторизовался, то возвращаем его к странице авторизации
+    if session.get("user_id"):
+        # Читаем из БД список запросов
+        items = Item.get_element()
+        # Формируем таблицу
+        table = ItemTable(items)
+        # Возвращаем страницу с интегрированной таблицей
+        return render_template("history.html", tables=table)
+    else:
+        return redirect("login")
