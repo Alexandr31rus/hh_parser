@@ -1,5 +1,6 @@
 import json
 import time
+from datetime import datetime
 from pathlib import Path
 
 import requests as req
@@ -175,11 +176,73 @@ def process_request(db_session, file_folder, row_request):
 
 
 def update_status(db_session, row_request, status):
-    pass
+    """Меняет статус заявки и сохраняет изменение в БД.
+
+        Обновляет запись в таблице ``requests`` по ``id`` заявки.
+        Набор полей зависит от нового статуса:
+
+        * **``status == 1``** («в обработке») — обновляются только
+          ``status`` и ``updated``. ``vacancy_number`` **не трогается**
+          (заявка ещё в работе, число вакансий пока неизвестно).
+        * **любой другой статус** — обновляются ``status``,
+          ``updated``, а ``vacancy_number`` **сбрасывается в 0**.
+          Это рассчитано на статус ``2`` («обработано, вакансий
+          нет»), но фактически сработает для любого значения.
+
+        Args:
+            db_session: Активная сессия SQLAlchemy
+                (:class:`sqlalchemy.orm.Session`).
+            row_request: ORM-объект :class:`Request` — заявка,
+                которой нужно сменить статус. Используется только
+                ``row_request.id`` — остальные атрибуты не читаются.
+            status: Новый статус (``int``). В проекте используются:
+                ``0`` — новая, ``1`` — в обработке, ``2`` — обработана.
+
+        Returns:
+            None
+        """
+    # Если статус меняется на один (В обработке), то не надо изменять кол-во вакансий
+    if status == 1:
+        db_session.query(Request).filter(Request.id == row_request.id).update(
+            {Request.status: status, Request.updated: datetime.now()}, synchronize_session=False)
+        db_session.commit()
+    else:
+        db_session.query(Request).filter(Request.id == row_request.id).update(
+            {Request.status: status, Request.vacancy_number: 0, Request.updated: datetime.now()},
+            synchronize_session=False)
+        db_session.commit()
 
 
 def update_request(db_session, row_request, file_name, number_vacancies):
-    pass
+    """Сохраняет результаты обработки заявки в БД.
+
+        Обновляет запись в таблице ``requests`` по ``id`` заявки:
+        записывает имя JSON-файла с результатами, количество
+        обработанных вакансий и переводит статус в ``2``
+        («обработано»). Одним запросом — без промежуточных
+        ``update_status``.
+
+        Args:
+            db_session: Активная сессия SQLAlchemy
+                (:class:`sqlalchemy.orm.Session`).
+            row_request: ORM-объект :class:`Request` — заявка,
+                которую нужно обновить. Используется только
+                ``row_request.id``.
+            file_name: Имя (путь) JSON-файла с результатами.
+                В ``process_request`` передаётся как :class:`pathlib.Path`,
+                но колонка ``Request.file_name`` — ``String(250)``.
+                SQLAlchemy приведёт ``Path`` к строке при записи; при
+                чтении вернётся ``str``, не ``Path``.
+            number_vacancies: Количество обработанных вакансий
+                (``int``). Записывается в ``vacancy_number``.
+
+        Returns:
+            None
+        """
+    # Формируем запрос к БД
+    (db_session.query(Request).filter(Request.id == row_request.id).update(
+        {Request.file_name: file_name, Request.vacancy_number: number_vacancies, Request.status: 2}))
+    db_session.commit()
 
 
 def add_skills(sum_skills: dict, skills_to_add: list):
