@@ -28,7 +28,7 @@
 
 
 ## Структура проекта
-
+```text
 HH_parser/
 ├── src/
 │   ├── app/                      # Flask-приложение
@@ -58,6 +58,7 @@ HH_parser/
 ├── .gitignore
 ├── pyproject.toml
 └── README.md
+```
 
 ## Установка
 
