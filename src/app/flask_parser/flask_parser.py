@@ -1,3 +1,9 @@
+import flask
+import markupsafe
+
+if not hasattr(flask, "Markup"):
+    flask.Markup = markupsafe.Markup
+
 from flask import Blueprint, flash, redirect, render_template, request, session
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy import desc
@@ -82,8 +88,8 @@ class Item(object):
         # Обрабатываем полученный список
         for row_request in rows:
             # Вместо None устанавливаем количество вакансий в 0
-            vac_number = row_request.vacancies_number
-            if not row_request.vacancies_number:
+            vac_number = row_request.vacancy_number
+            if not row_request.vacancy_number:
                 vac_number = 0
             # Обрабатываем статус запроса
             if row_request.status == 0:
@@ -121,7 +127,34 @@ class Item(object):
 
 
 class ItemTable(Table):
-    pass
+    """HTML-таблица истории заявок для страницы ``/history``.
+
+        Обёртка над :class:`flask_table.Table`, которая форматирует
+        список :class:`Item` в таблицу Bootstrap для шаблона
+        ``history.html``.
+
+        Колонки:
+
+        * ``tab_id`` — порядковый номер заявки в таблице
+          (заголовок «Номер запроса»);
+        * ``region`` — регион поиска;
+        * ``text_request`` — текст поискового запроса;
+        * ``vacancies_number`` — количество найденных вакансий;
+        * ``status`` — текстовый статус
+          (``Инициализирован`` / ``В обработке`` / ``Завершен``);
+        * ``created`` — дата и время создания заявки;
+        * ``name`` — ссылка «Смотреть», ведущая на страницу
+          деталей заявки (endpoint ``flask_parser.single_item``).
+        """
+    # Атрибуты таблицы, которые будут использованы при ввыоде ее на экран
+    classes = ['table', 'table-bordered']
+    tab_id = Col('Номер запроса')
+    region = Col('Регион')
+    text_request = Col('Запрос')
+    vacancies_number = Col('Кол-во вакансий')
+    status = Col('Статус')
+    created = Col('Создан')
+    name = LinkCol('Смотреть', 'flask_parser.single_item', url_kwargs=dict(id='tab_id'))
 
 
 @parser_blueprint.route("/")
