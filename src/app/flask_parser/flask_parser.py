@@ -3,7 +3,7 @@ import markupsafe
 
 if not hasattr(flask, "Markup"):
     flask.Markup = markupsafe.Markup
-
+import json
 from flask import Blueprint, flash, redirect, render_template, request, session
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy import desc
@@ -282,3 +282,74 @@ def history():
         return render_template("history.html", tables=table)
     else:
         return redirect("login")
+
+
+@parser_blueprint.route('/item/<int:id>', methods=["GET", "POST"])
+def single_item(id):
+    """Показывает результаты обработки одной заявки.
+
+        Доступна только авторизованным: если в сессии нет ``user_id``,
+        происходит редирект на страницу входа.
+
+        Для авторизованного пользователя:
+
+        1. Находит заявку по ``tab_id`` через
+           :meth:`Item.get_element_by_id`.
+        2. Достаёт из БД имя JSON-файла с результатами
+           (``Request.file_name``).
+        3. Если файл есть — читает его и формирует три списка для
+           шаблона:
+
+           * ``description`` — топ-10 технологий из описания
+             (``"Python - 45.5%"``);
+           * ``keyskills`` — топ-10 технологий из ключевых навыков
+             (``"SQL - 30.0%"``);
+           * ``salaries`` — средние зарплаты по грейдам
+             (``"Middle   от: 100000₽.  до: 150000₽."``).
+
+        4. Если файла ещё нет (заявка не обработана или обработана
+           без результатов) — передаёт в шаблон пустые списки.
+
+        Args:
+            id: Порядковый номер заявки в истории (``tab_id`` из
+                :class:`Item`), а не ``id`` заявки в БД.
+
+        Returns:
+            Response: отрендеренный ``request-view.html`` с тремя
+            списками (``description``, ``keyskills``, ``salaries``),
+            либо редирект на ``login`` для неавторизованных.
+        """
+    # Эта страница доступна только для авторизованного пользователя
+    if session.get("user_id"):
+        # Достаем из списка требуемый элемент
+        element = Item.get_element_by_id(id)
+        # Достаем из БД имя файла с результатами обработки запроса
+        row: Request = db_session.query(Request).filter(Request.id == element.request_id).one()
+        if row.file_name is not None:
+            # Читаем результаты обработки запроса из файла
+            with open(row.file_name, "r", encoding='utf-8') as f:
+                result: dict = json.load(f)
+            # Обрабатываем результаты запроса
+            description_skills: dict = result["description"]
+            key_skills: dict = result["keyskills"]
+            salary_average: dict = result["salary"]
+            # Для навыков из описания
+            sum_description: list = []
+            for key, value in list(description_skills.items())[:10]:
+                sum_description.append(f"{key} - {value}%")
+            # Для навыков из ключевых навыков
+            sum_keyskills: list = []
+            for key, value in list(key_skills.items())[:10]:
+                sum_keyskills.append(f"{key} - {value}%")
+            sum_salaries: list = []
+            # Для зарплат
+            for key, value in salary_average.items():
+                sum_salaries.append(
+                    key + "   от: " + '{:6.0f}'.format(value[0]) + "₽.  до: " + '{:6.0f}'.format(value[1]) + "₽.")
+            # Возвращаем страницу с результатами запроса
+            return render_template("request-view.html", description=sum_description, keyskills=sum_keyskills,
+                                   salaries=sum_salaries)
+        else:
+            return render_template("request-view.html", description=[], keyskills=[], salaries=[])
+    else:
+        return redirect("/login")
