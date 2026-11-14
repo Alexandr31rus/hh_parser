@@ -11,7 +11,113 @@ parser_blueprint = Blueprint("flask_parser", __name__)
 
 
 class Item(object):
-    pass
+    """Запись истории заявок — строка для таблицы на странице ``/history``.
+
+        Обёртка над :class:`Request` с «человеческими» значениями:
+
+        * ``tab_id`` — порядковый номер для отображения (1, 2, 3, …);
+        * ``request_id`` — реальный ``id`` заявки в БД (для ссылок,
+          действий);
+        * ``status`` — текстовое описание статуса
+          (``Инициализирован`` / ``В обработке`` / ``Завершен`` /
+          ``Неопределен``) вместо числового кода;
+        * ``vacancies_number`` — число вакансий, где ``None`` заменён
+          на ``0``.
+
+        Экземпляры создаются только через :meth:`get_element` (или
+        :meth:`get_element_by_id`) — напрямую из модели ``Request``.
+    """
+
+    def __init__(self, tab_id, req_id, region, text_request, status, vac_number, created):
+        """Создаёт запись истории заявки.
+
+        Args:
+            tab_id: Порядковый номер для отображения в таблице
+                (1, 2, 3, …). Не совпадает с ``request_id`` —
+                это просто нумерация строк.
+            req_id: Реальный ``id`` заявки из таблицы ``requests``.
+            region: Название региона поиска.
+            text_request: Текст поискового запроса.
+            status: Текстовое описание статуса
+                (``Инициализирован`` / ``В обработке`` /
+                ``Завершен`` / ``Неопределен``).
+            vac_number: Количество найденных вакансий. ``0``,
+                если заявка ещё не обработана.
+            created: Дата и время создания заявки
+                (:class:`datetime.datetime`).
+        """
+        self.tab_id = tab_id
+        self.request_id = req_id
+        self.region = region
+        self.text_request = text_request
+        self.vacancies_number = vac_number
+        self.status = status
+        self.created = created
+
+    @classmethod
+    def get_element(cls):
+        """Возвращает историю заявок текущего пользователя.
+
+        Читает из БД все заявки пользователя из ``session["user_id"]``,
+        отсортированные по ``created`` по убыванию (свежие сверху),
+        и преобразует их в список :class:`Item` для отображения:
+
+        * числовой статус (``0``/``1``/``2``) заменяется на
+          текстовый (``Инициализирован`` / ``В обработке`` /
+          ``Завершен`` / ``Неопределен``);
+        * ``vacancy_number = None`` заменяется на ``0``;
+        * каждому элементу присваивается порядковый ``tab_id``
+          (1, 2, 3, …).
+
+        Returns:
+            list[Item]: Список записей истории, отсортированный по
+            дате создания (свежие сверху). Пустой список, если у
+            пользователя нет заявок.
+        """
+        # Читаем из БД список запросов для текущего пользователя
+        rows = db_session.query(Request).filter(Request.user_id == session["user_id"]).order_by(
+            desc(Request.created)).all()
+        id_n = 1
+        items_for_table = []
+        # Обрабатываем полученный список
+        for row_request in rows:
+            # Вместо None устанавливаем количество вакансий в 0
+            vac_number = row_request.vacancies_number
+            if not row_request.vacancies_number:
+                vac_number = 0
+            # Обрабатываем статус запроса
+            if row_request.status == 0:
+                status = 'Инициализирован'
+            elif row_request.status == 1:
+                status = 'В обработке'
+            elif row_request.status == 2:
+                status = 'Завершен'
+            else:
+                status = 'Неопределен'
+            # Добавляем элемент в таблицу
+            items_for_table.append(
+                Item(id_n, row_request.id, row_request.region, row_request.text_request, status, vac_number,
+                     row_request.created))
+            id_n += 1
+        return items_for_table
+
+    @classmethod
+    def get_element_by_id(cls, id):
+        """Возвращает запись истории по её порядковому номеру ``tab_id``.
+
+        Ищет в результате :meth:`get_element` элемент с
+        ``tab_id == id`` и возвращает его.
+
+        Args:
+            id: Порядковый номер строки в таблице (``tab_id``,
+                начиная с 1), а не ``id`` заявки в БД. Для поиска
+                по реальному ``id`` используйте атрибут
+                ``request_id``.
+
+        Returns:
+            Item: Запись истории с указанным ``tab_id``.
+        """
+        return [i for i in cls.get_element() if i.tab_id == id][0]
 
 
 class ItemTable(Table):
