@@ -4,10 +4,12 @@ import markupsafe
 if not hasattr(flask, "Markup"):
     flask.Markup = markupsafe.Markup
 import json
+
 from flask import Blueprint, flash, redirect, render_template, request, session
-from sqlalchemy.exc import SQLAlchemyError
+from flask_table import Col, LinkCol, Table
 from sqlalchemy import desc
-from flask_table import Table, Col, LinkCol
+from sqlalchemy.exc import SQLAlchemyError
+
 import src.parser_app.hhrequest as hr
 
 from ..database import db_session
@@ -19,22 +21,24 @@ parser_blueprint = Blueprint("flask_parser", __name__)
 class Item(object):
     """Запись истории заявок — строка для таблицы на странице ``/history``.
 
-        Обёртка над :class:`Request` с «человеческими» значениями:
+    Обёртка над :class:`Request` с «человеческими» значениями:
 
-        * ``tab_id`` — порядковый номер для отображения (1, 2, 3, …);
-        * ``request_id`` — реальный ``id`` заявки в БД (для ссылок,
-          действий);
-        * ``status`` — текстовое описание статуса
-          (``Инициализирован`` / ``В обработке`` / ``Завершен`` /
-          ``Неопределен``) вместо числового кода;
-        * ``vacancies_number`` — число вакансий, где ``None`` заменён
-          на ``0``.
+    * ``tab_id`` — порядковый номер для отображения (1, 2, 3, …);
+    * ``request_id`` — реальный ``id`` заявки в БД (для ссылок,
+      действий);
+    * ``status`` — текстовое описание статуса
+      (``Инициализирован`` / ``В обработке`` / ``Завершен`` /
+      ``Неопределен``) вместо числового кода;
+    * ``vacancies_number`` — число вакансий, где ``None`` заменён
+      на ``0``.
 
-        Экземпляры создаются только через :meth:`get_element` (или
-        :meth:`get_element_by_id`) — напрямую из модели ``Request``.
+    Экземпляры создаются только через :meth:`get_element` (или
+    :meth:`get_element_by_id`) — напрямую из модели ``Request``.
     """
 
-    def __init__(self, tab_id, req_id, region, text_request, status, vac_number, created):
+    def __init__(
+        self, tab_id, req_id, region, text_request, status, vac_number, created
+    ):
         """Создаёт запись истории заявки.
 
         Args:
@@ -81,8 +85,12 @@ class Item(object):
             пользователя нет заявок.
         """
         # Читаем из БД список запросов для текущего пользователя
-        rows = db_session.query(Request).filter(Request.user_id == session["user_id"]).order_by(
-            desc(Request.created)).all()
+        rows = (
+            db_session.query(Request)
+            .filter(Request.user_id == session["user_id"])
+            .order_by(desc(Request.created))
+            .all()
+        )
         id_n = 1
         items_for_table = []
         # Обрабатываем полученный список
@@ -93,17 +101,25 @@ class Item(object):
                 vac_number = 0
             # Обрабатываем статус запроса
             if row_request.status == 0:
-                status = 'Инициализирован'
+                status = "Инициализирован"
             elif row_request.status == 1:
-                status = 'В обработке'
+                status = "В обработке"
             elif row_request.status == 2:
-                status = 'Завершен'
+                status = "Завершен"
             else:
-                status = 'Неопределен'
+                status = "Неопределен"
             # Добавляем элемент в таблицу
             items_for_table.append(
-                Item(id_n, row_request.id, row_request.region, row_request.text_request, status, vac_number,
-                     row_request.created))
+                Item(
+                    id_n,
+                    row_request.id,
+                    row_request.region,
+                    row_request.text_request,
+                    status,
+                    vac_number,
+                    row_request.created,
+                )
+            )
             id_n += 1
         return items_for_table
 
@@ -129,32 +145,33 @@ class Item(object):
 class ItemTable(Table):
     """HTML-таблица истории заявок для страницы ``/history``.
 
-        Обёртка над :class:`flask_table.Table`, которая форматирует
-        список :class:`Item` в таблицу Bootstrap для шаблона
-        ``history.html``.
+    Обёртка над :class:`flask_table.Table`, которая форматирует
+    список :class:`Item` в таблицу Bootstrap для шаблона
+    ``history.html``.
 
-        Колонки:
+    Колонки:
 
-        * ``tab_id`` — порядковый номер заявки в таблице
-          (заголовок «Номер запроса»);
-        * ``region`` — регион поиска;
-        * ``text_request`` — текст поискового запроса;
-        * ``vacancies_number`` — количество найденных вакансий;
-        * ``status`` — текстовый статус
-          (``Инициализирован`` / ``В обработке`` / ``Завершен``);
-        * ``created`` — дата и время создания заявки;
-        * ``name`` — ссылка «Смотреть», ведущая на страницу
-          деталей заявки (endpoint ``flask_parser.single_item``).
-        """
+    * ``tab_id`` — порядковый номер заявки в таблице
+      (заголовок «Номер запроса»);
+    * ``region`` — регион поиска;
+    * ``text_request`` — текст поискового запроса;
+    * ``vacancies_number`` — количество найденных вакансий;
+    * ``status`` — текстовый статус
+      (``Инициализирован`` / ``В обработке`` / ``Завершен``);
+    * ``created`` — дата и время создания заявки;
+    * ``name`` — ссылка «Смотреть», ведущая на страницу
+      деталей заявки (endpoint ``flask_parser.single_item``).
+    """
+
     # Атрибуты таблицы, которые будут использованы при ввыоде ее на экран
-    classes = ['table', 'table-bordered']
-    tab_id = Col('Номер запроса')
-    region = Col('Регион')
-    text_request = Col('Запрос')
-    vacancies_number = Col('Кол-во вакансий')
-    status = Col('Статус')
-    created = Col('Создан')
-    name = LinkCol('Смотреть', 'flask_parser.single_item', url_kwargs=dict(id='tab_id'))
+    classes = ["table", "table-bordered"]
+    tab_id = Col("Номер запроса")
+    region = Col("Регион")
+    text_request = Col("Запрос")
+    vacancies_number = Col("Кол-во вакансий")
+    status = Col("Статус")
+    created = Col("Создан")
+    name = LinkCol("Смотреть", "flask_parser.single_item", url_kwargs=dict(id="tab_id"))
 
 
 @parser_blueprint.route("/")
@@ -253,25 +270,25 @@ def requests():
     return render_template("requests.html")
 
 
-@parser_blueprint.route('/history')
+@parser_blueprint.route("/history")
 def history():
     """Отдаёт страницу с историей заявок текущего пользователя.
 
-        Доступна только авторизованным: если в сессии нет ``user_id``,
-        происходит редирект на страницу входа.
+    Доступна только авторизованным: если в сессии нет ``user_id``,
+    происходит редирект на страницу входа.
 
-        Для авторизованного пользователя:
+    Для авторизованного пользователя:
 
-        1. Читает из БД список заявок через ``Item.get_element()``.
-        2. Оборачивает его в :class:`ItemTable` — HTML-таблицу для
-           шаблона.
-        3. Рендерит ``history.html``, передавая таблицу в контекст
-           под именем ``tables``.
+    1. Читает из БД список заявок через ``Item.get_element()``.
+    2. Оборачивает его в :class:`ItemTable` — HTML-таблицу для
+       шаблона.
+    3. Рендерит ``history.html``, передавая таблицу в контекст
+       под именем ``tables``.
 
-        Returns:
-            Response: редирект на ``login`` для неавторизованных,
-            либо отрендеренный ``history.html`` с таблицей заявок.
-        """
+    Returns:
+        Response: редирект на ``login`` для неавторизованных,
+        либо отрендеренный ``history.html`` с таблицей заявок.
+    """
     # Если пользователь не авторизовался, то возвращаем его к странице авторизации
     if session.get("user_id"):
         # Читаем из БД список запросов
@@ -284,50 +301,52 @@ def history():
         return redirect("login")
 
 
-@parser_blueprint.route('/item/<int:id>', methods=["GET", "POST"])
+@parser_blueprint.route("/item/<int:id>", methods=["GET", "POST"])
 def single_item(id):
     """Показывает результаты обработки одной заявки.
 
-        Доступна только авторизованным: если в сессии нет ``user_id``,
-        происходит редирект на страницу входа.
+    Доступна только авторизованным: если в сессии нет ``user_id``,
+    происходит редирект на страницу входа.
 
-        Для авторизованного пользователя:
+    Для авторизованного пользователя:
 
-        1. Находит заявку по ``tab_id`` через
-           :meth:`Item.get_element_by_id`.
-        2. Достаёт из БД имя JSON-файла с результатами
-           (``Request.file_name``).
-        3. Если файл есть — читает его и формирует три списка для
-           шаблона:
+    1. Находит заявку по ``tab_id`` через
+       :meth:`Item.get_element_by_id`.
+    2. Достаёт из БД имя JSON-файла с результатами
+       (``Request.file_name``).
+    3. Если файл есть — читает его и формирует три списка для
+       шаблона:
 
-           * ``description`` — топ-10 технологий из описания
-             (``"Python - 45.5%"``);
-           * ``keyskills`` — топ-10 технологий из ключевых навыков
-             (``"SQL - 30.0%"``);
-           * ``salaries`` — средние зарплаты по грейдам
-             (``"Middle   от: 100000₽.  до: 150000₽."``).
+       * ``description`` — топ-10 технологий из описания
+         (``"Python - 45.5%"``);
+       * ``keyskills`` — топ-10 технологий из ключевых навыков
+         (``"SQL - 30.0%"``);
+       * ``salaries`` — средние зарплаты по грейдам
+         (``"Middle   от: 100000₽.  до: 150000₽."``).
 
-        4. Если файла ещё нет (заявка не обработана или обработана
-           без результатов) — передаёт в шаблон пустые списки.
+    4. Если файла ещё нет (заявка не обработана или обработана
+       без результатов) — передаёт в шаблон пустые списки.
 
-        Args:
-            id: Порядковый номер заявки в истории (``tab_id`` из
-                :class:`Item`), а не ``id`` заявки в БД.
+    Args:
+        id: Порядковый номер заявки в истории (``tab_id`` из
+            :class:`Item`), а не ``id`` заявки в БД.
 
-        Returns:
-            Response: отрендеренный ``request-view.html`` с тремя
-            списками (``description``, ``keyskills``, ``salaries``),
-            либо редирект на ``login`` для неавторизованных.
-        """
+    Returns:
+        Response: отрендеренный ``request-view.html`` с тремя
+        списками (``description``, ``keyskills``, ``salaries``),
+        либо редирект на ``login`` для неавторизованных.
+    """
     # Эта страница доступна только для авторизованного пользователя
     if session.get("user_id"):
         # Достаем из списка требуемый элемент
         element = Item.get_element_by_id(id)
         # Достаем из БД имя файла с результатами обработки запроса
-        row: Request = db_session.query(Request).filter(Request.id == element.request_id).one()
+        row: Request = (
+            db_session.query(Request).filter(Request.id == element.request_id).one()
+        )
         if row.file_name is not None:
             # Читаем результаты обработки запроса из файла
-            with open(row.file_name, "r", encoding='utf-8') as f:
+            with open(row.file_name, "r", encoding="utf-8") as f:
                 result: dict = json.load(f)
             # Обрабатываем результаты запроса
             description_skills: dict = result["description"]
@@ -345,11 +364,23 @@ def single_item(id):
             # Для зарплат
             for key, value in salary_average.items():
                 sum_salaries.append(
-                    key + "   от: " + '{:6.0f}'.format(value[0]) + "₽.  до: " + '{:6.0f}'.format(value[1]) + "₽.")
+                    key
+                    + "   от: "
+                    + "{:6.0f}".format(value[0])
+                    + "₽.  до: "
+                    + "{:6.0f}".format(value[1])
+                    + "₽."
+                )
             # Возвращаем страницу с результатами запроса
-            return render_template("request-view.html", description=sum_description, keyskills=sum_keyskills,
-                                   salaries=sum_salaries)
+            return render_template(
+                "request-view.html",
+                description=sum_description,
+                keyskills=sum_keyskills,
+                salaries=sum_salaries,
+            )
         else:
-            return render_template("request-view.html", description=[], keyskills=[], salaries=[])
+            return render_template(
+                "request-view.html", description=[], keyskills=[], salaries=[]
+            )
     else:
         return redirect("/login")
