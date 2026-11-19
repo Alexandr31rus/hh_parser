@@ -230,3 +230,6 @@ __marimo__/
 *.sqlite-journal
 *.sqlite-wal
 *.sqlite-shm
+.DS_Store
+src/.DS_Store
+src/Database/
